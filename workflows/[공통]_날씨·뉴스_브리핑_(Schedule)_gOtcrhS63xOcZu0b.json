@@ -1,0 +1,513 @@
+{
+  "id": "gOtcrhS63xOcZu0b",
+  "name": "[공통] 날씨·뉴스 브리핑 (Schedule)",
+  "active": true,
+  "activeVersionId": "b70ca24d-6625-460b-988c-aaadae103a2e",
+  "createdAt": "2026-09-03T08:26:43.440Z",
+  "updatedAt": "2026-09-03T09:06:26.686Z",
+  "isArchived": false,
+  "versionId": "b70ca24d-6625-460b-988c-aaadae103a2e",
+  "triggerCount": 1,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "schedule-1",
+      "name": "매일 9시 트리거",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        256,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openweathermap.org/data/2.5/weather",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "Seoul,KR"
+            },
+            {
+              "name": "appid",
+              "value": "1984c6c6a0111bc4c95e0712ad5828e1"
+            },
+            {
+              "name": "units",
+              "value": "metric"
+            },
+            {
+              "name": "lang",
+              "value": "kr"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "weather-1",
+      "name": "서울 날씨 조회",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "position": [
+        560,
+        304
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.yna.co.kr/rss/news.xml",
+        "options": {}
+      },
+      "id": "news-1",
+      "name": "연합뉴스 RSS 조회",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "position": [
+        560,
+        512
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "maxItems": 5
+      },
+      "id": "news-limit-1",
+      "name": "상위 5개만",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        800,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let weatherItems = [];\ntry { weatherItems = $('서울 날씨 조회').all(); } catch (e) {}\n\nlet newsItems = [];\ntry { newsItems = $('상위 5개만').all(); } catch (e) {}\n\nlet weatherText = '날씨 정보를 불러오지 못했습니다.';\nif (weatherItems.length > 0 && weatherItems[0].json && weatherItems[0].json.main) {\n  const w = weatherItems[0].json;\n  const temp = Math.round(w.main.temp);\n  const feelsLike = Math.round(w.main.feels_like);\n  const desc = w.weather && w.weather[0] ? w.weather[0].description : '';\n  const humidity = w.main.humidity;\n  weatherText = `현재 기온 ${temp}°C (체감 ${feelsLike}°C), ${desc}, 습도 ${humidity}%`;\n}\n\nconst newsLines = newsItems.map((item, idx) => {\n  const title = item.json.title || '(제목 없음)';\n  const link = item.json.link || '';\n  return `${idx + 1}. <${link}|${title}>`;\n}).join('\\n');\n\nconst today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });\n\nconst message = `📅 *${today} 아침 브리핑*\\n\\n☀️ *서울 날씨*\\n${weatherText}\\n\\n📰 *오늘의 주요 뉴스*\\n${newsLines}`;\n\nreturn [{ json: { message } }];"
+      },
+      "id": "format-1",
+      "name": "메시지 포맷팅",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "n8n"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
+      },
+      "id": "slack-2",
+      "name": "Slack 브리핑 전송",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "position": [
+        1312,
+        400
+      ],
+      "webhookId": "45bb9cc6-0d85-461c-a015-f0ac4bbee72b",
+      "credentials": {
+        "slackApi": {
+          "id": "lL2Vqet1dPhgO8fJ",
+          "name": "Slack account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "merge-1",
+      "name": "날씨+뉴스 합류",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        992,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "매일 9시 트리거": {
+      "main": [
+        [
+          {
+            "node": "서울 날씨 조회",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "연합뉴스 RSS 조회",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "연합뉴스 RSS 조회": {
+      "main": [
+        [
+          {
+            "node": "상위 5개만",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "메시지 포맷팅": {
+      "main": [
+        [
+          {
+            "node": "Slack 브리핑 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "서울 날씨 조회": {
+      "main": [
+        [
+          {
+            "node": "날씨+뉴스 합류",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "상위 5개만": {
+      "main": [
+        [
+          {
+            "node": "날씨+뉴스 합류",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "날씨+뉴스 합류": {
+      "main": [
+        [
+          {
+            "node": "메시지 포맷팅",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": {
+    "node:매일 9시 트리거": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": null,
+  "tags": [],
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "gOtcrhS63xOcZu0b",
+      "projectId": "12XtYwT3sM7pBq0c",
+      "createdAt": "2026-09-03T08:26:43.440Z",
+      "updatedAt": "2026-09-03T08:26:43.440Z"
+    }
+  ],
+  "activeVersion": {
+    "versionId": "b70ca24d-6625-460b-988c-aaadae103a2e",
+    "workflowId": "gOtcrhS63xOcZu0b",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 9
+              }
+            ]
+          }
+        },
+        "id": "schedule-1",
+        "name": "매일 9시 트리거",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.4,
+        "position": [
+          256,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://api.openweathermap.org/data/2.5/weather",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "q",
+                "value": "Seoul,KR"
+              },
+              {
+                "name": "appid",
+                "value": "1984c6c6a0111bc4c95e0712ad5828e1"
+              },
+              {
+                "name": "units",
+                "value": "metric"
+              },
+              {
+                "name": "lang",
+                "value": "kr"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "id": "weather-1",
+        "name": "서울 날씨 조회",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.5,
+        "alwaysOutputData": true,
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 3000,
+        "position": [
+          560,
+          304
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "url": "https://www.yna.co.kr/rss/news.xml",
+          "options": {}
+        },
+        "id": "news-1",
+        "name": "연합뉴스 RSS 조회",
+        "type": "n8n-nodes-base.rssFeedRead",
+        "typeVersion": 1.2,
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 3000,
+        "position": [
+          560,
+          512
+        ],
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "maxItems": 5
+        },
+        "id": "news-limit-1",
+        "name": "상위 5개만",
+        "type": "n8n-nodes-base.limit",
+        "typeVersion": 1,
+        "position": [
+          800,
+          512
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "let weatherItems = [];\ntry { weatherItems = $('서울 날씨 조회').all(); } catch (e) {}\n\nlet newsItems = [];\ntry { newsItems = $('상위 5개만').all(); } catch (e) {}\n\nlet weatherText = '날씨 정보를 불러오지 못했습니다.';\nif (weatherItems.length > 0 && weatherItems[0].json && weatherItems[0].json.main) {\n  const w = weatherItems[0].json;\n  const temp = Math.round(w.main.temp);\n  const feelsLike = Math.round(w.main.feels_like);\n  const desc = w.weather && w.weather[0] ? w.weather[0].description : '';\n  const humidity = w.main.humidity;\n  weatherText = `현재 기온 ${temp}°C (체감 ${feelsLike}°C), ${desc}, 습도 ${humidity}%`;\n}\n\nconst newsLines = newsItems.map((item, idx) => {\n  const title = item.json.title || '(제목 없음)';\n  const link = item.json.link || '';\n  return `${idx + 1}. <${link}|${title}>`;\n}).join('\\n');\n\nconst today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });\n\nconst message = `📅 *${today} 아침 브리핑*\\n\\n☀️ *서울 날씨*\\n${weatherText}\\n\\n📰 *오늘의 주요 뉴스*\\n${newsLines}`;\n\nreturn [{ json: { message } }];"
+        },
+        "id": "format-1",
+        "name": "메시지 포맷팅",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1168,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "mode": "name",
+            "value": "n8n"
+          },
+          "text": "={{ $json.message }}",
+          "otherOptions": {}
+        },
+        "id": "slack-2",
+        "name": "Slack 브리핑 전송",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.7,
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 3000,
+        "position": [
+          1312,
+          400
+        ],
+        "webhookId": "45bb9cc6-0d85-461c-a015-f0ac4bbee72b",
+        "credentials": {
+          "slackApi": {
+            "id": "lL2Vqet1dPhgO8fJ",
+            "name": "Slack account"
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "mode": "combine",
+          "combineBy": "combineAll",
+          "options": {}
+        },
+        "id": "merge-1",
+        "name": "날씨+뉴스 합류",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3.2,
+        "position": [
+          992,
+          400
+        ]
+      }
+    ],
+    "connections": {
+      "매일 9시 트리거": {
+        "main": [
+          [
+            {
+              "node": "서울 날씨 조회",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "연합뉴스 RSS 조회",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "연합뉴스 RSS 조회": {
+        "main": [
+          [
+            {
+              "node": "상위 5개만",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "메시지 포맷팅": {
+        "main": [
+          [
+            {
+              "node": "Slack 브리핑 전송",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "서울 날씨 조회": {
+        "main": [
+          [
+            {
+              "node": "날씨+뉴스 합류",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "상위 5개만": {
+        "main": [
+          [
+            {
+              "node": "날씨+뉴스 합류",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "날씨+뉴스 합류": {
+        "main": [
+          [
+            {
+              "node": "메시지 포맷팅",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "moon kwuiyoung",
+    "name": null,
+    "description": null,
+    "autosaved": true,
+    "createdAt": "2026-09-03T08:52:21.965Z",
+    "updatedAt": "2026-09-03T08:52:21.965Z"
+  }
+}
