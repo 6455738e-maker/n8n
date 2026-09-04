@@ -1,0 +1,174 @@
+{
+  "id": "7uh5SWI6lG0lj3CI",
+  "name": "[공통] Slack 알림 전송 (Webhook)",
+  "active": true,
+  "activeVersionId": "9029056b-c26a-4a09-b7c5-a09edd6205e8",
+  "createdAt": "2026-09-03T07:17:07.444Z",
+  "updatedAt": "2026-09-03T09:06:23.841Z",
+  "isArchived": false,
+  "versionId": "9029056b-c26a-4a09-b7c5-a09edd6205e8",
+  "triggerCount": 1,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-notify",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "웹훅",
+      "webhookId": "e5e27269-121b-4d67-a6a7-4675a8da7e2e",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "n8n"
+        },
+        "text": "={{ $json.body.message || $json.message }}",
+        "otherOptions": {},
+        "resource": "message",
+        "operation": "post"
+      },
+      "id": "slack-1",
+      "name": "Slack 알림 전송",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "position": [
+        560,
+        304
+      ],
+      "webhookId": "f5f5fb00-e1b1-455f-adb3-6bd9063b804f",
+      "credentials": {
+        "slackApi": {
+          "id": "lL2Vqet1dPhgO8fJ",
+          "name": "Slack account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "웹훅": {
+      "main": [
+        [
+          {
+            "node": "Slack 알림 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "shared": [
+    {
+      "role": "workflow:owner",
+      "workflowId": "7uh5SWI6lG0lj3CI",
+      "projectId": "12XtYwT3sM7pBq0c",
+      "createdAt": "2026-09-03T07:17:07.444Z",
+      "updatedAt": "2026-09-03T07:17:07.444Z"
+    }
+  ],
+  "activeVersion": {
+    "versionId": "9029056b-c26a-4a09-b7c5-a09edd6205e8",
+    "workflowId": "7uh5SWI6lG0lj3CI",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "slack-notify",
+          "options": {}
+        },
+        "id": "webhook-1",
+        "name": "웹훅",
+        "webhookId": "e5e27269-121b-4d67-a6a7-4675a8da7e2e",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          256,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "select": "channel",
+          "channelId": {
+            "__rl": true,
+            "mode": "name",
+            "value": "n8n"
+          },
+          "text": "={{ $json.body.message || $json.message }}",
+          "otherOptions": {},
+          "resource": "message",
+          "operation": "post"
+        },
+        "id": "slack-1",
+        "name": "Slack 알림 전송",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2.7,
+        "retryOnFail": true,
+        "maxTries": 2,
+        "waitBetweenTries": 3000,
+        "position": [
+          560,
+          304
+        ],
+        "webhookId": "f5f5fb00-e1b1-455f-adb3-6bd9063b804f",
+        "credentials": {
+          "slackApi": {
+            "id": "lL2Vqet1dPhgO8fJ",
+            "name": "Slack account"
+          }
+        },
+        "onError": "continueRegularOutput"
+      }
+    ],
+    "connections": {
+      "웹훅": {
+        "main": [
+          [
+            {
+              "node": "Slack 알림 전송",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "moon kwuiyoung",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "createdAt": "2026-09-03T07:57:44.043Z",
+    "updatedAt": "2026-09-03T07:57:44.043Z"
+  }
+}
