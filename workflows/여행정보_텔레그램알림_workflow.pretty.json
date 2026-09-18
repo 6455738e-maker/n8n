@@ -1,0 +1,326 @@
+{
+  "updatedAt": "2026-09-17T06:40:25.395Z",
+  "createdAt": "2026-09-17T06:40:25.395Z",
+  "id": "t58830kdkA9Oa87b",
+  "name": "여행 정보 수집 → 텔레그램 알림 (네이버 검색)",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "trigger1",
+      "name": "매일 오전 9시",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "keywords1",
+      "name": "키워드 목록",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// ▼ 텔레그램으로 알림 받을 chat ID (n8n UI에서 실제 값으로 교체)\nconst TELEGRAM_CHAT_ID = 'YOUR_CHAT_ID';\n\nconst keywords = ['축제', '관광지원금', '박람회', '여행지원금', '프로모션'];\n\n// 이번 실행에서 누적할 결과를 초기화\nconst staticData = $getWorkflowStaticData('global');\nstaticData.collectedResults = [];\nstaticData.telegramChatId = TELEGRAM_CHAT_ID;\n\nreturn keywords.map(k => ({ json: { keyword: k } }));"
+      }
+    },
+    {
+      "id": "splitbatch1",
+      "name": "키워드별 반복",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "httpreq1",
+      "name": "네이버 뉴스 검색",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput",
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://openapi.naver.com/v1/search/news.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ $json.keyword }}"
+            },
+            {
+              "name": "display",
+              "value": "10"
+            },
+            {
+              "name": "sort",
+              "value": "date"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "code2",
+      "name": "결과 정리 및 누적",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nif (!staticData.collectedResults) staticData.collectedResults = [];\n\nconst input = $input.first().json;\nconst keyword = $('키워드별 반복').first().json.keyword;\n\nconst items = input.items || [];\n\nfor (const it of items) {\n  const title = (it.title || '').replace(/<[^>]*>/g, '');\n  const description = (it.description || '').replace(/<[^>]*>/g, '');\n  staticData.collectedResults.push({\n    keyword,\n    title,\n    description,\n    link: it.originallink || it.link,\n    pubDate: it.pubDate\n  });\n}\n\nreturn [{ json: { keyword, count: items.length } }];"
+      }
+    },
+    {
+      "id": "errorpass1",
+      "name": "검색 실패 처리",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        220
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const keyword = $('키워드별 반복').first().json.keyword;\nconsole.log(`네이버 검색 실패: ${keyword}`);\nreturn [{ json: { keyword, error: true } }];"
+      }
+    },
+    {
+      "id": "limit1",
+      "name": "완료 1회만",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        440,
+        -160
+      ],
+      "parameters": {
+        "maxItems": 1
+      }
+    },
+    {
+      "id": "code3",
+      "name": "텔레그램 메시지 조합",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst results = staticData.collectedResults || [];\n\nconst today = new Date().toLocaleDateString('ko-KR');\n\nif (results.length === 0) {\n  return [{ json: { message: `🗓️ ${today} 여행 정보 수집 결과\\n\\n오늘은 새로운 소식이 없습니다.` } }];\n}\n\n// 키워드별 그룹핑\nconst byKeyword = {};\nfor (const r of results) {\n  if (!byKeyword[r.keyword]) byKeyword[r.keyword] = [];\n  byKeyword[r.keyword].push(r);\n}\n\nlet message = `🗓️ *${today} 여행 정보 수집 결과*\\n`;\n\nfor (const [keyword, items] of Object.entries(byKeyword)) {\n  message += `\\n🔹 *${keyword}* (${items.length}건)\\n`;\n  for (const it of items.slice(0, 5)) {\n    message += `- ${it.title}\\n  ${it.link}\\n`;\n  }\n}\n\n// 텔레그램 메시지 길이 제한(4096자) 대비\nif (message.length > 4000) {\n  message = message.slice(0, 3990) + '\\n...(이하 생략)';\n}\n\n// 다음 실행을 위해 초기화\nstaticData.collectedResults = [];\n\nreturn [{ json: { message } }];"
+      }
+    },
+    {
+      "id": "telegram1",
+      "name": "텔레그램 전송",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "position": [
+        880,
+        -160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $vars.TELEGRAM_CHAT_ID || 'YOUR_CHAT_ID' }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "webhookId": "539cc468-d69e-4b63-94d2-f8280084e092"
+    }
+  ],
+  "connections": {
+    "매일 오전 9시": {
+      "main": [
+        [
+          {
+            "node": "키워드 목록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "키워드 목록": {
+      "main": [
+        [
+          {
+            "node": "키워드별 반복",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "키워드별 반복": {
+      "main": [
+        [
+          {
+            "node": "완료 1회만",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "네이버 뉴스 검색",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "네이버 뉴스 검색": {
+      "main": [
+        [
+          {
+            "node": "결과 정리 및 누적",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "검색 실패 처리",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "결과 정리 및 누적": {
+      "main": [
+        [
+          {
+            "node": "키워드별 반복",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "검색 실패 처리": {
+      "main": [
+        [
+          {
+            "node": "키워드별 반복",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "완료 1회만": {
+      "main": [
+        [
+          {
+            "node": "텔레그램 메시지 조합",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "텔레그램 메시지 조합": {
+      "main": [
+        [
+          {
+            "node": "텔레그램 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "b097816d-b398-4ee9-873a-7a4affff2d0a",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-09-17T06:40:25.395Z",
+      "createdAt": "2026-09-17T06:40:25.395Z",
+      "role": "workflow:owner",
+      "workflowId": "t58830kdkA9Oa87b",
+      "projectId": "12XtYwT3sM7pBq0c",
+      "project": {
+        "updatedAt": "2026-09-04T01:21:44.285Z",
+        "createdAt": "2026-09-02T10:57:01.828Z",
+        "id": "12XtYwT3sM7pBq0c",
+        "name": "귀영 문 <6455738e@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "a95ec313-40c5-43cf-b5f4-954930c7c424"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}
