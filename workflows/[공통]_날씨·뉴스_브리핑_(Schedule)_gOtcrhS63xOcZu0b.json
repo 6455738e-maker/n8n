@@ -40,7 +40,7 @@
             },
             {
               "name": "appid",
-              "value": "1984c6c6a0111bc4c95e0712ad5828e1"
+              "value": "={{ $env.OPENWEATHER_API_KEY }}"
             },
             {
               "name": "units",
@@ -304,7 +304,7 @@
               },
               {
                 "name": "appid",
-                "value": "1984c6c6a0111bc4c95e0712ad5828e1"
+                "value": "={{ $env.OPENWEATHER_API_KEY }}"
               },
               {
                 "name": "units",
